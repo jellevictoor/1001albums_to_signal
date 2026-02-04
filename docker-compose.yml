@@ -1,0 +1,37 @@
+services:
+  signal:
+    image: bbernhard/signal-cli-rest-api:latest
+    environment:
+      - MODE=native
+    ports:
+      - "8080:8080"
+    volumes:
+      - signal-data:/home/.local/share/signal-cli
+    restart: unless-stopped
+
+  album-bot:
+    build: ./bot
+    depends_on:
+      - signal
+    environment:
+      - ALBUMS_PROJECT_NAME=${ALBUMS_PROJECT_NAME}
+      - SIGNAL_PHONE_NUMBER=${SIGNAL_PHONE_NUMBER}
+      - SIGNAL_GROUP_ID=${SIGNAL_GROUP_ID}
+      - SIGNAL_API_URL=http://signal:8080
+    profiles:
+      - manual
+
+  scheduler:
+    image: mcuadros/ofelia:latest
+    depends_on:
+      - signal
+    command: daemon --docker
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    labels:
+      ofelia.job-run.album-bot.schedule: "${SCHEDULE:-0 9 * * *}"
+      ofelia.job-run.album-bot.container: "album-bot"
+    restart: unless-stopped
+
+volumes:
+  signal-data:
