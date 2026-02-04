@@ -4,13 +4,16 @@ services:
     environment:
       - MODE=native
     ports:
-      - "8080:8080"
+      - "8082:8080"
     volumes:
       - signal-data:/home/.local/share/signal-cli
     restart: unless-stopped
+    networks:
+      - album-net
 
   album-bot:
     build: ./bot
+    image: album-bot:latest
     depends_on:
       - signal
     environment:
@@ -18,20 +21,29 @@ services:
       - SIGNAL_PHONE_NUMBER=${SIGNAL_PHONE_NUMBER}
       - SIGNAL_GROUP_ID=${SIGNAL_GROUP_ID}
       - SIGNAL_API_URL=http://signal:8080
+    networks:
+      - album-net
     profiles:
       - manual
 
   scheduler:
     image: mcuadros/ofelia:latest
-    depends_on:
-      - signal
     command: daemon --docker
+    environment:
+      - TZ=Europe/Brussels
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-    labels:
-      ofelia.job-run.album-bot.schedule: "${SCHEDULE:-0 9 * * *}"
-      ofelia.job-run.album-bot.container: "album-bot"
     restart: unless-stopped
+    labels:
+      ofelia.enabled: "true"
+      ofelia.job-run.album-bot.schedule: "${SCHEDULE:-0 9 * * *}"
+      ofelia.job-run.album-bot.image: "album-bot:latest"
+      ofelia.job-run.album-bot.network: "1001albums_to_signal_album-net"
+      ofelia.job-run.album-bot.environment: "ALBUMS_PROJECT_NAME=${ALBUMS_PROJECT_NAME};SIGNAL_PHONE_NUMBER=${SIGNAL_PHONE_NUMBER};SIGNAL_GROUP_ID=${SIGNAL_GROUP_ID};SIGNAL_API_URL=http://signal:8080"
+      ofelia.job-run.album-bot.delete: "true"
+
+networks:
+  album-net:
 
 volumes:
   signal-data:

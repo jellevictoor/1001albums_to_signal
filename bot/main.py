@@ -33,21 +33,32 @@ def format_message(album):
     name = album.get("name", "Unknown Album")
     year = album.get("releaseDate", "")[:4] if album.get("releaseDate") else "Unknown"
     genres = ", ".join(album.get("genres", [])) or "Unknown"
-    spotify_url = album.get("spotifyUrl", "")
-    wikipedia_url = album.get("wikipediaUrl", "")
+
+    # Build streaming URLs from IDs
+    spotify_id = album.get("spotifyId", "")
+    deezer_id = album.get("deezerId", "")
+    youtube_id = album.get("youtubeMusicId", "")
+
+    # Group URL for reviewing
+    review_url = f"https://1001albumsgenerator.com/groups/{config.ALBUMS_PROJECT_NAME}"
 
     lines = [
         "🎵 Album of the Day",
         "",
-        f"Artist: {artist}",
-        f"Album: {name} ({year})",
+        f"{artist} - {name} ({year})",
         f"Genre: {genres}",
+        "",
     ]
 
-    if spotify_url:
-        lines.append(f"\n🔗 {spotify_url}")
-    if wikipedia_url:
-        lines.append(f"📖 {wikipedia_url}")
+    if spotify_id:
+        lines.append(f"🟢 https://open.spotify.com/album/{spotify_id}")
+    if deezer_id:
+        lines.append(f"🎵 https://www.deezer.com/album/{deezer_id}")
+    if youtube_id:
+        lines.append(f"🔴 https://music.youtube.com/playlist?list={youtube_id}")
+
+    lines.append(f"\n⭐ Rate & review: {review_url}")
+    lines.append("Don't forget to rate yesterday's album!")
 
     return "\n".join(lines)
 
