@@ -8,16 +8,11 @@ import requests
 import config
 
 
-def fetch_album():
-    """Fetch current album from 1001albumsgenerator API."""
+def fetch_group_data():
+    """Fetch full group data from 1001albumsgenerator API."""
     response = requests.get(config.ALBUMS_API_URL, timeout=30)
     response.raise_for_status()
-    data = response.json()
-
-    if "currentAlbum" not in data or data["currentAlbum"] is None:
-        return None
-
-    return data["currentAlbum"]
+    return response.json()
 
 
 def download_image(url):
@@ -63,6 +58,64 @@ def format_message(album):
     return "\n".join(lines)
 
 
+def format_milestone_message(group_data):
+    """Format a milestone summary message from group stats."""
+    count = group_data.get("numberOfGeneratedAlbums", 0)
+    avg_rating = group_data.get("averageRating")
+
+    lines = [
+        f"🏆 Milestone: {count} Albums!",
+        "",
+    ]
+
+    if avg_rating is not None:
+        lines.append(f"Overall average rating: {avg_rating:.1f}/5.0")
+        lines.append("")
+
+    top = group_data.get("highestRatedAlbums", [])[:3]
+    if top:
+        lines.append("⬆️ Top rated:")
+        for album in top:
+            rating = album.get("averageRating", 0)
+            lines.append(f"  {album.get('artist', '?')} - {album.get('name', '?')} ({rating:.1f})")
+        lines.append("")
+
+    bottom = group_data.get("lowestRatedAlbums", [])[:3]
+    if bottom:
+        lines.append("⬇️ Bottom rated:")
+        for album in bottom:
+            rating = album.get("averageRating", 0)
+            lines.append(f"  {album.get('artist', '?')} - {album.get('name', '?')} ({rating:.1f})")
+        lines.append("")
+
+    fav_genres = group_data.get("favoriteGenres", [])
+    worst_genres = group_data.get("worstGenres", [])
+    if fav_genres:
+        lines.append(f"❤️ Favorite genre: {fav_genres[0].get('genre', '?')}")
+    if worst_genres:
+        lines.append(f"💔 Worst genre: {worst_genres[0].get('genre', '?')}")
+
+    by_decade = group_data.get("ratingByDecade", [])
+    if by_decade:
+        best = max(by_decade, key=lambda d: d.get("rating", 0))
+        worst = min(by_decade, key=lambda d: d.get("rating", 0))
+        lines.append(f"📅 Best decade: {best.get('decade', '?')}s ({best.get('rating', 0):.1f})")
+        lines.append(f"📅 Worst decade: {worst.get('decade', '?')}s ({worst.get('rating', 0):.1f})")
+
+    return "\n".join(lines)
+
+
+def sync_signal():
+    """Receive pending messages to keep signal-cli in sync (required for group messaging)."""
+    url = f"{config.SIGNAL_API_URL}/v1/receive/{config.SIGNAL_PHONE_NUMBER}"
+    try:
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+        print("Signal sync completed")
+    except requests.RequestException as e:
+        print(f"Signal sync warning (continuing anyway): {e}")
+
+
 def send_signal_message(message, image_base64=None):
     """Send message to Signal group via REST API."""
     url = f"{config.SIGNAL_API_URL}/v2/send"
@@ -86,7 +139,7 @@ def main():
 
     for attempt in range(3):
         try:
-            album = fetch_album()
+            group_data = fetch_group_data()
             break
         except requests.RequestException as e:
             print(f"Attempt {attempt + 1} failed: {e}")
@@ -96,6 +149,7 @@ def main():
                 print("Failed to fetch album after 3 attempts")
                 sys.exit(1)
 
+    album = group_data.get("currentAlbum")
     if album is None:
         print("No current album (project may be paused or finished)")
         sys.exit(0)
@@ -117,6 +171,9 @@ def main():
             except requests.RequestException as e:
                 print(f"Failed to download image: {e}, sending text-only")
 
+    print("Syncing Signal (receiving pending messages)...")
+    sync_signal()
+
     print("Sending to Signal...")
     try:
         send_signal_message(message, image_base64)
@@ -124,6 +181,17 @@ def main():
     except requests.RequestException as e:
         print(f"Failed to send Signal message: {e}")
         sys.exit(1)
+
+    # Check for milestone
+    album_count = group_data.get("numberOfGeneratedAlbums", 0)
+    if album_count > 0 and album_count % 25 == 0:
+        print(f"Milestone reached: {album_count} albums! Sending summary...")
+        milestone_msg = format_milestone_message(group_data)
+        try:
+            send_signal_message(milestone_msg)
+            print("Milestone message sent!")
+        except requests.RequestException as e:
+            print(f"Failed to send milestone message: {e}")
 
 
 if __name__ == "__main__":
