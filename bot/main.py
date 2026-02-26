@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import argparse
 import base64
 import sys
 import time
@@ -22,7 +23,7 @@ def download_image(url):
     return base64.b64encode(response.content).decode("utf-8")
 
 
-def format_message(album):
+def format_message(album, album_number, total_albums):
     """Format album info as a message."""
     artist = album.get("artist", "Unknown Artist")
     name = album.get("name", "Unknown Album")
@@ -38,7 +39,7 @@ def format_message(album):
     review_url = f"https://1001albumsgenerator.com/groups/{config.ALBUMS_PROJECT_NAME}"
 
     lines = [
-        "🎵 Album of the Day",
+        f"🎵 Album of the Day ({album_number}/{total_albums})",
         "",
         f"{artist} - {name} ({year})",
         f"Genre: {genres}",
@@ -62,6 +63,8 @@ def format_milestone_message(group_data):
     """Format a milestone summary message from group stats."""
     count = group_data.get("numberOfGeneratedAlbums", 0)
     avg_rating = group_data.get("averageRating")
+    total_votes = group_data.get("totalVotes", 0)
+    members = group_data.get("members", [])
 
     lines = [
         f"🏆 Milestone: {count} Albums!",
@@ -69,38 +72,44 @@ def format_milestone_message(group_data):
     ]
 
     if avg_rating is not None:
-        lines.append(f"Overall average rating: {avg_rating:.1f}/5.0")
-        lines.append("")
+        lines.append(f"Average rating: {avg_rating:.1f}/5.0")
+    lines.append(f"Total votes: {total_votes} by {len(members)} members")
+    if count > 0:
+        lines.append(f"Votes per album: {total_votes / count:.1f}")
+    lines.append("")
 
-    top = group_data.get("highestRatedAlbums", [])[:3]
+    top = group_data.get("highestRatedAlbums", [])[:5]
     if top:
         lines.append("⬆️ Top rated:")
         for album in top:
             rating = album.get("averageRating", 0)
-            lines.append(f"  {album.get('artist', '?')} - {album.get('name', '?')} ({rating:.1f})")
+            lines.append(f"  {rating:.1f} - {album.get('artist', '?')} - {album.get('name', '?')}")
         lines.append("")
 
-    bottom = group_data.get("lowestRatedAlbums", [])[:3]
+    bottom = group_data.get("lowestRatedAlbums", [])[:5]
     if bottom:
         lines.append("⬇️ Bottom rated:")
         for album in bottom:
             rating = album.get("averageRating", 0)
-            lines.append(f"  {album.get('artist', '?')} - {album.get('name', '?')} ({rating:.1f})")
+            lines.append(f"  {rating:.1f} - {album.get('artist', '?')} - {album.get('name', '?')}")
         lines.append("")
 
     fav_genres = group_data.get("favoriteGenres", [])
     worst_genres = group_data.get("worstGenres", [])
-    if fav_genres:
-        lines.append(f"❤️ Favorite genre: {fav_genres[0].get('genre', '?')}")
-    if worst_genres:
-        lines.append(f"💔 Worst genre: {worst_genres[0].get('genre', '?')}")
+    if fav_genres or worst_genres:
+        lines.append("🎶 Genres:")
+        for g in fav_genres:
+            lines.append(f"  ❤️ {g.get('genre', '?')} ({g.get('rating', 0):.1f}, {g.get('numberOfAlbums', 0)} albums)")
+        for g in worst_genres:
+            lines.append(f"  💔 {g.get('genre', '?')} ({g.get('rating', 0):.1f}, {g.get('numberOfAlbums', 0)} albums)")
+        lines.append("")
 
     by_decade = group_data.get("ratingByDecade", [])
     if by_decade:
-        best = max(by_decade, key=lambda d: d.get("rating", 0))
-        worst = min(by_decade, key=lambda d: d.get("rating", 0))
-        lines.append(f"📅 Best decade: {best.get('decade', '?')}s ({best.get('rating', 0):.1f})")
-        lines.append(f"📅 Worst decade: {worst.get('decade', '?')}s ({worst.get('rating', 0):.1f})")
+        by_decade_sorted = sorted(by_decade, key=lambda d: d.get("rating", 0), reverse=True)
+        lines.append("📅 Decades:")
+        for d in by_decade_sorted:
+            lines.append(f"  {d.get('decade', '?')}s: {d.get('rating', 0):.1f} ({d.get('numberOfAlbums', 0)} albums)")
 
     return "\n".join(lines)
 
@@ -135,6 +144,11 @@ def send_signal_message(message, image_base64=None):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dry-run", action="store_true", help="Print messages instead of sending to Signal")
+    parser.add_argument("--force-milestone", action="store_true", help="Force milestone message regardless of album count")
+    args = parser.parse_args()
+
     print("Fetching album from 1001albumsgenerator...")
 
     for attempt in range(3):
@@ -156,7 +170,9 @@ def main():
 
     print(f"Album: {album.get('name')} by {album.get('artist')}")
 
-    message = format_message(album)
+    album_count = group_data.get("numberOfGeneratedAlbums", 0)
+    total_albums = group_data.get("totalAlbums", 1001)
+    message = format_message(album,1+ album_count, total_albums)
 
     # Try to download cover image
     image_base64 = None
@@ -171,6 +187,16 @@ def main():
             except requests.RequestException as e:
                 print(f"Failed to download image: {e}, sending text-only")
 
+    if args.dry_run:
+        print("\n--- DRY RUN (not sending to Signal) ---")
+        print(message)
+        print(f"\n[Image: {'yes' if image_base64 else 'no'}]")
+        print(f"Album count: {album_count}")
+        if args.force_milestone or (album_count > 0 and album_count % 25 == 0):
+            print("\n--- MILESTONE MESSAGE ---")
+            print(format_milestone_message(group_data))
+        return
+
     print("Syncing Signal (receiving pending messages)...")
     sync_signal()
 
@@ -183,7 +209,6 @@ def main():
         sys.exit(1)
 
     # Check for milestone
-    album_count = group_data.get("numberOfGeneratedAlbums", 0)
     print(f"Album count: {album_count}")
     if album_count > 0 and album_count % 25 == 0:
         print(f"Milestone reached: {album_count} albums! Sending summary...")
