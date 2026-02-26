@@ -184,6 +184,7 @@ def main():
 
     # Check for milestone
     album_count = group_data.get("numberOfGeneratedAlbums", 0)
+    print(f"Album count: {album_count}")
     if album_count > 0 and album_count % 25 == 0:
         print(f"Milestone reached: {album_count} albums! Sending summary...")
         milestone_msg = format_milestone_message(group_data)
