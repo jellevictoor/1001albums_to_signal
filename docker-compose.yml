@@ -21,6 +21,8 @@ services:
       - SIGNAL_PHONE_NUMBER=${SIGNAL_PHONE_NUMBER}
       - SIGNAL_GROUP_ID=${SIGNAL_GROUP_ID}
       - SIGNAL_API_URL=http://signal:8080
+    volumes:
+      - bot-data:/data
     networks:
       - album-net
     profiles:
@@ -40,10 +42,19 @@ services:
       ofelia.job-run.album-bot.image: "album-bot:latest"
       ofelia.job-run.album-bot.network: "1001albums_to_signal_album-net"
       ofelia.job-run.album-bot.environment: '["ALBUMS_PROJECT_NAME=${ALBUMS_PROJECT_NAME}", "SIGNAL_PHONE_NUMBER=${SIGNAL_PHONE_NUMBER}", "SIGNAL_GROUP_ID=${SIGNAL_GROUP_ID}", "SIGNAL_API_URL=http://signal:8080"]'
+      ofelia.job-run.album-bot.volume: '["1001albums_to_signal_bot-data:/data"]'
       ofelia.job-run.album-bot.delete: "true"
+      ofelia.job-run.rating-check.schedule: "${RATING_SCHEDULE:-0 0 12,18,22 * * *}"
+      ofelia.job-run.rating-check.image: "album-bot:latest"
+      ofelia.job-run.rating-check.network: "1001albums_to_signal_album-net"
+      ofelia.job-run.rating-check.command: "python check_ratings.py"
+      ofelia.job-run.rating-check.environment: '["ALBUMS_PROJECT_NAME=${ALBUMS_PROJECT_NAME}", "SIGNAL_PHONE_NUMBER=${SIGNAL_PHONE_NUMBER}", "SIGNAL_GROUP_ID=${SIGNAL_GROUP_ID}", "SIGNAL_API_URL=http://signal:8080"]'
+      ofelia.job-run.rating-check.volume: '["1001albums_to_signal_bot-data:/data"]'
+      ofelia.job-run.rating-check.delete: "true"
 
 networks:
   album-net:
 
 volumes:
   signal-data:
+  bot-data:

@@ -1,12 +1,53 @@
 #!/usr/bin/env python3
 import argparse
 import base64
+import json
+import os
 import sys
 import time
 
 import requests
 
 import config
+
+STATE_FILE = os.environ.get("STATE_FILE", "/data/album_state.json")
+
+
+def load_state():
+    """Load tracked album state from disk."""
+    if os.path.exists(STATE_FILE):
+        with open(STATE_FILE) as f:
+            return json.load(f)
+    return {"tracked_albums": []}
+
+
+def save_state(state):
+    """Save tracked album state to disk."""
+    os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
+    with open(STATE_FILE, "w") as f:
+        json.dump(state, f, indent=2)
+
+
+def track_album(album):
+    """Add current album to tracking state so ratings can be checked later."""
+    state = load_state()
+    tracked = state["tracked_albums"]
+    uuid = album.get("uuid")
+    if not uuid:
+        return
+    # Don't add duplicates
+    if any(a["uuid"] == uuid for a in tracked):
+        return
+    tracked.append({
+        "uuid": uuid,
+        "name": album.get("name", "Unknown"),
+        "artist": album.get("artist", "Unknown"),
+        "ratings_posted": False,
+    })
+    # Only keep last 14 albums to avoid unbounded growth
+    state["tracked_albums"] = tracked[-14:]
+    save_state(state)
+    print(f"Tracking album for ratings: {album.get('artist')} - {album.get('name')}")
 
 
 def fetch_group_data():
@@ -169,6 +210,9 @@ def main():
         sys.exit(0)
 
     print(f"Album: {album.get('name')} by {album.get('artist')}")
+
+    # Track this album so the ratings checker can pick it up later
+    track_album(album)
 
     album_count = group_data.get("numberOfGeneratedAlbums", 0)
     total_albums = group_data.get("totalAlbums", 1001)
