@@ -22,13 +22,18 @@ def fetch_album_reviews(album_uuid):
     return response.json()
 
 
+def has_rated(review):
+    """Check if a member has given a numeric rating (did-not-listen doesn't count)."""
+    return isinstance(review.get("rating"), (int, float))
+
+
 def format_ratings_message(album_data, reviews_data, group_rating):
     """Format a ratings summary message."""
     artist = album_data["artist"]
     name = album_data["name"]
     reviews = reviews_data.get("reviews", [])
 
-    rated = [r for r in reviews if r.get("rating") is not None]
+    rated = [r for r in reviews if has_rated(r)]
     avg = sum(r["rating"] for r in rated) / len(rated) if rated else 0
 
     lines = [
@@ -38,9 +43,9 @@ def format_ratings_message(album_data, reviews_data, group_rating):
     ]
 
     for r in reviews:
-        rating = r.get("rating")
-        if rating is None:
+        if not has_rated(r):
             continue
+        rating = r["rating"]
         comment = r.get("review")
         entry = f"  {r.get('projectName', '?')}: {'*' * rating} ({rating})"
         if comment:
@@ -101,7 +106,7 @@ def main():
             continue
 
         reviews = reviews_data.get("reviews", [])
-        rated_count = sum(1 for r in reviews if r.get("rating") is not None)
+        rated_count = sum(1 for r in reviews if has_rated(r))
         print(f"  {rated_count}/{member_count} ratings in")
 
         if rated_count < required_votes:
