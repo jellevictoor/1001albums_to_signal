@@ -73,6 +73,7 @@ def format_message(album, album_number, total_albums):
 
     # Build streaming URLs from IDs
     spotify_id = album.get("spotifyId", "")
+    apple_music_id = album.get("appleMusicId", "")
     deezer_id = album.get("deezerId", "")
     youtube_id = album.get("youtubeMusicId", "")
 
@@ -89,6 +90,8 @@ def format_message(album, album_number, total_albums):
 
     if spotify_id:
         lines.append(f"🟢 https://open.spotify.com/album/{spotify_id}")
+    if apple_music_id:
+        lines.append(f"🍎 https://music.apple.com/album/{apple_music_id}")
     if deezer_id:
         lines.append(f"🎵 https://www.deezer.com/album/{deezer_id}")
     if youtube_id:
