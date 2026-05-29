@@ -183,6 +183,8 @@ def send_signal_message(message, image_base64=None):
         payload["base64_attachments"] = [f"data:image/jpeg;base64,{image_base64}"]
 
     response = requests.post(url, json=payload, timeout=60)
+    if not response.ok:
+        print(f"Signal API error {response.status_code}: {response.text}")
     response.raise_for_status()
     return response.json()
 
@@ -253,7 +255,16 @@ def main():
         print("Message sent successfully!")
     except requests.RequestException as e:
         print(f"Failed to send Signal message: {e}")
-        sys.exit(1)
+        if image_base64:
+            print("Retrying without image...")
+            try:
+                send_signal_message(message)
+                print("Message sent successfully (without image)!")
+            except requests.RequestException as e2:
+                print(f"Failed to send Signal message without image: {e2}")
+                sys.exit(1)
+        else:
+            sys.exit(1)
 
     # Check for milestone
     print(f"Album count: {album_count}")
