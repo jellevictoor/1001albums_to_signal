@@ -158,17 +158,6 @@ def format_milestone_message(group_data):
     return "\n".join(lines)
 
 
-def sync_signal():
-    """Receive pending messages to keep signal-cli in sync (required for group messaging)."""
-    url = f"{config.SIGNAL_API_URL}/v1/receive/{config.SIGNAL_PHONE_NUMBER}"
-    try:
-        response = requests.get(url, timeout=30)
-        response.raise_for_status()
-        print("Signal sync completed")
-    except requests.RequestException as e:
-        print(f"Signal sync warning (continuing anyway): {e}")
-
-
 def send_signal_message(message, image_base64=None):
     """Send message to Signal group via REST API."""
     url = f"{config.SIGNAL_API_URL}/v2/send"
@@ -182,7 +171,9 @@ def send_signal_message(message, image_base64=None):
     if image_base64:
         payload["base64_attachments"] = [f"data:image/jpeg;base64,{image_base64}"]
 
-    response = requests.post(url, json=payload, timeout=60)
+    # Must exceed signal-cli-rest-api's own send timeout (120s), so that a slow
+    # send returns its real error instead of the client abandoning a live request.
+    response = requests.post(url, json=payload, timeout=150)
     if not response.ok:
         print(f"Signal API error {response.status_code}: {response.text}")
     response.raise_for_status()
@@ -245,9 +236,6 @@ def main():
             print("\n--- MILESTONE MESSAGE ---")
             print(format_milestone_message(group_data))
         return
-
-    print("Syncing Signal (receiving pending messages)...")
-    sync_signal()
 
     print("Sending to Signal...")
     try:

@@ -8,7 +8,7 @@ import time
 import requests
 
 import config
-from main import load_state, save_state, fetch_group_data, sync_signal, send_signal_message
+from main import load_state, save_state, fetch_group_data, send_signal_message
 
 RATING_THRESHOLD = 0.8  # Post when 80% of members have rated
 API_DELAY = 20  # Seconds between album API calls (rate limit: 3 req/60s)
@@ -85,10 +85,6 @@ def main():
 
     required_votes = math.ceil(member_count * RATING_THRESHOLD)
     print(f"Group has {member_count} members, need {required_votes} votes (80%)")
-
-    if not args.dry_run:
-        print("Syncing Signal...")
-        sync_signal()
 
     posted_any = False
     for i, album in enumerate(pending):
