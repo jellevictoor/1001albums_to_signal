@@ -21,7 +21,8 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r bot/requirements.txt pytest
-      - run: python -m pytest bot/tests
+      - run: python -m pytest tests
+        working-directory: bot
 
   docker:
     needs: test
