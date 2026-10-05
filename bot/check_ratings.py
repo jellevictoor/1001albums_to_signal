@@ -8,7 +8,8 @@ import time
 import requests
 
 import config
-from main import load_state, save_state, fetch_group_data, send_signal_message
+from main import fetch_group_data, load_state, save_state
+from signal_client import send_group_message
 
 RATING_THRESHOLD = 0.8  # Post when 80% of members have rated
 API_DELAY = 20  # Seconds between album API calls (rate limit: 3 req/60s)
@@ -116,7 +117,7 @@ def main():
             print(f"\n--- DRY RUN ---\n{message}\n---\n")
         else:
             try:
-                send_signal_message(message)
+                send_group_message(message)
                 print(f"  Ratings posted!")
             except requests.RequestException as e:
                 print(f"  Failed to send: {e}")

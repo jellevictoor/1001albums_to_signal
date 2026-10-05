@@ -6,3 +6,4 @@ SIGNAL_GROUP_ID = os.environ["SIGNAL_GROUP_ID"]
 SIGNAL_API_URL = os.environ.get("SIGNAL_API_URL", "http://signal:8080")
 
 ALBUMS_API_URL = f"https://1001albumsgenerator.com/api/v1/groups/{ALBUMS_PROJECT_NAME}"
+SIGNAL_CLI_DATA_DIR = os.environ.get("SIGNAL_CLI_DATA_DIR", "/signal-cli/data")

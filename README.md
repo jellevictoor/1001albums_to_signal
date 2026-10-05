@@ -61,3 +61,27 @@ docker compose up -d
 ```bash
 docker compose run --rm album-bot
 ```
+
+## When a group send hangs
+
+signal-cli (native, 0.14.x) sometimes hangs on a group send instead of
+returning an error: it reuses a sender key whose device list the server no
+longer agrees with, and the multi-recipient request never gets a response
+(AsamK/signal-cli #2101, #2113). The bot handles this on its own:
+
+1. the send times out (150s);
+2. a note-to-self reports the failure to the operator;
+3. the group's shared sender key is forgotten in signal-cli's account store,
+   so the retry redistributes it per device over the path that does report
+   device changes;
+4. the send is retried once, and a second note reports the outcome.
+
+For step 3 the bot needs signal-cli's data directory mounted read-write
+(`SIGNAL_CLI_DATA_DIR`, default `/signal-cli/data`); `docker-compose.yml`
+mounts the `signal-data` volume accordingly.
+
+## Tests
+
+```bash
+cd bot && python -m pytest tests
+```

@@ -9,6 +9,7 @@ import time
 import requests
 
 import config
+from signal_client import send_group_message
 
 STATE_FILE = os.environ.get("STATE_FILE", "/data/album_state.json")
 
@@ -158,28 +159,6 @@ def format_milestone_message(group_data):
     return "\n".join(lines)
 
 
-def send_signal_message(message, image_base64=None):
-    """Send message to Signal group via REST API."""
-    url = f"{config.SIGNAL_API_URL}/v2/send"
-
-    payload = {
-        "message": message,
-        "number": config.SIGNAL_PHONE_NUMBER,
-        "recipients": [config.SIGNAL_GROUP_ID],
-    }
-
-    if image_base64:
-        payload["base64_attachments"] = [f"data:image/jpeg;base64,{image_base64}"]
-
-    # Must exceed signal-cli-rest-api's own send timeout (120s), so that a slow
-    # send returns its real error instead of the client abandoning a live request.
-    response = requests.post(url, json=payload, timeout=150)
-    if not response.ok:
-        print(f"Signal API error {response.status_code}: {response.text}")
-    response.raise_for_status()
-    return response.json()
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true", help="Print messages instead of sending to Signal")
@@ -239,14 +218,14 @@ def main():
 
     print("Sending to Signal...")
     try:
-        send_signal_message(message, image_base64)
+        send_group_message(message, image_base64)
         print("Message sent successfully!")
     except requests.RequestException as e:
         print(f"Failed to send Signal message: {e}")
         if image_base64:
             print("Retrying without image...")
             try:
-                send_signal_message(message)
+                send_group_message(message)
                 print("Message sent successfully (without image)!")
             except requests.RequestException as e2:
                 print(f"Failed to send Signal message without image: {e2}")
@@ -260,7 +239,7 @@ def main():
         print(f"Milestone reached: {album_count} albums! Sending summary...")
         milestone_msg = format_milestone_message(group_data)
         try:
-            send_signal_message(milestone_msg)
+            send_group_message(milestone_msg)
             print("Milestone message sent!")
         except requests.RequestException as e:
             print(f"Failed to send milestone message: {e}")
