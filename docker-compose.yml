@@ -7,6 +7,8 @@ services:
       - "8082:8080"
     volumes:
       - signal-data:/home/.local/share/signal-cli
+      # Debug instrumentation: starts the signal-cli daemon with --verbose
+      - ./signal-cli-verbose.sh:/usr/local/bin/signal-cli-native:ro
     restart: unless-stopped
     networks:
       - album-net
